@@ -182,7 +182,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF5C6BC0).withOpacity(0.35),
+            color: Color(0xFF5C6BC0).withValues(alpha: 0.35),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -209,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _statItem(String label, String value, IconData icon) {
     return Column(
       children: [
-        Icon(icon, color: Colors.white.withOpacity(0.85), size: 20),
+        Icon(icon, color: Colors.white.withValues(alpha: 0.85), size: 20),
         const SizedBox(height: 4),
         Text(
           value,
@@ -222,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Text(
           label,
           style:
-              TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.75)),
+              TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.75)),
         ),
       ],
     );
@@ -232,7 +232,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       width: 1,
       height: 44,
-      color: Colors.white.withOpacity(0.25),
+      color: Colors.white.withValues(alpha: 0.25),
     );
   }
 
@@ -263,7 +263,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   boxShadow: selected
                       ? [
                           BoxShadow(
-                            color: const Color(0xFF5C6BC0).withOpacity(0.3),
+                            color: Color(0xFF5C6BC0).withValues(alpha: 0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           )

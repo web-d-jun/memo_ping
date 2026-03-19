@@ -179,7 +179,7 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
               color: const Color(0xFFEDE7F6),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: const Color(0xFF5C6BC0).withOpacity(0.3),
+                color: Color(0xFF5C6BC0).withValues(alpha: 0.3),
                 width: 1.5,
               ),
             ),
@@ -332,7 +332,7 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
                       '$confidence%',
                       style: TextStyle(
                         fontSize: 10,
-                        color: Colors.white.withOpacity(0.75),
+                        color: Colors.white.withValues(alpha: 0.75),
                       ),
                     ),
                   ],

@@ -216,7 +216,7 @@ class _AddMemoScreenState extends State<AddMemoScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -361,7 +361,7 @@ class _AddMemoScreenState extends State<AddMemoScreen> {
             activeTrackColor: const Color(0xFF26C6DA),
             inactiveTrackColor: const Color(0xFFE0F7FA),
             thumbColor: const Color(0xFF26C6DA),
-            overlayColor: const Color(0xFF26C6DA).withOpacity(0.12),
+            overlayColor: Color(0xFF26C6DA).withValues(alpha: 0.12),
             trackHeight: 4,
           ),
           child: Slider(
