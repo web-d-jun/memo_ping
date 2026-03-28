@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 /// ML Kit 영문 레이블 → 한국어 번역 맵
 const Map<String, String> _kLabelMap = {
@@ -175,7 +176,56 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
   List<String> _ocrTexts = []; // OCR로 인식된 단어 목록
   String? _errorMessage;
 
+  Future<bool> _ensurePermission(ImageSource source) async {
+    if (Platform.isIOS && source == ImageSource.gallery) {
+      return true;
+    }
+
+    final permission =
+        source == ImageSource.camera ? Permission.camera : Permission.photos;
+
+    var status = await permission.status;
+    if (status.isGranted || status.isLimited) return true;
+
+    status = await permission.request();
+    if (status.isGranted || status.isLimited) return true;
+
+    if (!mounted) return false;
+
+    final targetLabel = source == ImageSource.camera ? '카메라' : '사진';
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('권한 필요'),
+        content: Text('$targetLabel 접근 권한이 필요합니다. 설정에서 권한을 허용해주세요.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await openAppSettings();
+            },
+            child: const Text('설정 열기'),
+          ),
+        ],
+      ),
+    );
+
+    return false;
+  }
+
   Future<void> _pickAndAnalyze(ImageSource source) async {
+    final hasPermission = await _ensurePermission(source);
+    if (!hasPermission) {
+      setState(() {
+        _errorMessage = '권한이 없어 사진을 불러올 수 없어요.';
+      });
+      return;
+    }
+
     setState(() {
       _isProcessing = false;
       _imageFile = null;
@@ -190,7 +240,12 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
       imageQuality: 85,
       maxWidth: 1024,
     );
-    if (xFile == null) return;
+    if (xFile == null) {
+      setState(() {
+        _errorMessage = '사진 선택이 취소되었어요.';
+      });
+      return;
+    }
 
     setState(() {
       _isProcessing = true;
@@ -243,14 +298,14 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
     }
   }
 
-  void _showSourcePicker() {
-    showModalBottomSheet(
+  Future<void> _showSourcePicker() async {
+    final source = await showModalBottomSheet<ImageSource>(
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => SafeArea(
+      builder: (sheetContext) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
           child: Column(
@@ -280,10 +335,8 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
                       label: '카메라',
                       color: const Color(0xFF5C6BC0),
                       bgColor: const Color(0xFFEDE7F6),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _pickAndAnalyze(ImageSource.camera);
-                      },
+                      onTap: () => Navigator.of(sheetContext)
+                          .pop(ImageSource.camera),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -293,10 +346,8 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
                       label: '갤러리',
                       color: const Color(0xFF26C6DA),
                       bgColor: const Color(0xFFE0F7FA),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _pickAndAnalyze(ImageSource.gallery);
-                      },
+                      onTap: () => Navigator.of(sheetContext)
+                          .pop(ImageSource.gallery),
                     ),
                   ),
                 ],
@@ -307,6 +358,11 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
         ),
       ),
     );
+
+    if (source == null || !mounted) return;
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    if (!mounted) return;
+    await _pickAndAnalyze(source);
   }
 
   Widget _sourceButton({
