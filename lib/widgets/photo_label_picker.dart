@@ -177,12 +177,11 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
   String? _errorMessage;
 
   Future<bool> _ensurePermission(ImageSource source) async {
-    if (Platform.isIOS && source == ImageSource.gallery) {
+    if (source == ImageSource.gallery) {
       return true;
     }
 
-    final permission =
-        source == ImageSource.camera ? Permission.camera : Permission.photos;
+    final permission = Permission.camera;
 
     var status = await permission.status;
     if (status.isGranted || status.isLimited) return true;
@@ -192,12 +191,11 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
 
     if (!mounted) return false;
 
-    final targetLabel = source == ImageSource.camera ? '카메라' : '사진';
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('권한 필요'),
-        content: Text('$targetLabel 접근 권한이 필요합니다. 설정에서 권한을 허용해주세요.'),
+        content: const Text('카메라 접근 권한이 필요합니다. 설정에서 권한을 허용해주세요.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),

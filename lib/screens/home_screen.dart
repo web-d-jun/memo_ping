@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../models/memo_item.dart';
 import '../widgets/memo_card.dart';
 import 'add_memo_screen.dart';
@@ -80,7 +82,24 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _memos.removeWhere((m) => m.id == id));
   }
 
+  Future<void> _preRequestCameraPermission() async {
+    if (kIsWeb) return;
+
+    final platform = defaultTargetPlatform;
+    if (platform != TargetPlatform.android && platform != TargetPlatform.iOS) {
+      return;
+    }
+
+    final status = await Permission.camera.status;
+    if (status.isGranted || status.isLimited || status.isPermanentlyDenied) {
+      return;
+    }
+
+    await Permission.camera.request();
+  }
+
   Future<void> _openAddMemo() async {
+    await _preRequestCameraPermission();
     final result = await Navigator.push<MemoItem>(
       context,
       MaterialPageRoute(builder: (_) => const AddMemoScreen()),
