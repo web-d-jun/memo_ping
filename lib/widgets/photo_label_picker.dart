@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
@@ -177,7 +178,9 @@ class PhotoLabelPicker extends StatefulWidget {
 }
 
 class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
-  static const String _apiBaseUrl = 'http://10.0.2.2:5000';
+  static String get _apiBaseUrl => defaultTargetPlatform == TargetPlatform.android
+      ? 'http://10.0.2.2:5000'
+      : 'http://localhost:5000';
 
   bool _isProcessing = false;
   File? _imageFile;
