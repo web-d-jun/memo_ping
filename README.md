@@ -19,3 +19,7 @@ samples, guidance on mobile development, and a full API reference.
 ## IOS
 실행전 확인
  - cd ios && pod install
+
+
+## 에뮬레이터에 이미지 복사
+- adb push assets/images /sdcard/Pictures/

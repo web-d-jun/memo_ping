@@ -1,9 +1,16 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:http/http.dart' as http;
+
+class PredictedLabel {
+  final String label;
+  final double score;
+
+  const PredictedLabel({required this.label, required this.score});
+}
 
 /// ML Kit 영문 레이블 → 한국어 번역 맵
 const Map<String, String> _kLabelMap = {
@@ -170,11 +177,33 @@ class PhotoLabelPicker extends StatefulWidget {
 }
 
 class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
+  static const String _apiBaseUrl = 'http://10.0.2.2:5000';
+
   bool _isProcessing = false;
   File? _imageFile;
-  List<ImageLabel> _labels = [];
+  List<PredictedLabel> _labels = [];
   List<String> _ocrTexts = []; // OCR로 인식된 단어 목록
   String? _errorMessage;
+
+  Future<Map<String, dynamic>> _analyzeWithFlask(File imageFile) async {
+    final uri = Uri.parse('$_apiBaseUrl/analyze');
+    final request = http.MultipartRequest('POST', uri)
+      ..files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+
+    final streamedResponse = await request.send();
+    final responseBody = await streamedResponse.stream.bytesToString();
+
+    if (streamedResponse.statusCode != 200) {
+      throw Exception('API ${streamedResponse.statusCode}: $responseBody');
+    }
+
+    final decoded = jsonDecode(responseBody);
+    if (decoded is! Map<String, dynamic>) {
+      throw Exception('잘못된 API 응답 형식');
+    }
+
+    return decoded;
+  }
 
   Future<bool> _ensurePermission(ImageSource source) async {
     if (source == ImageSource.gallery) {
@@ -217,6 +246,8 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
 
   Future<void> _pickAndAnalyze(ImageSource source) async {
     final hasPermission = await _ensurePermission(source);
+    if (!mounted) return;
+
     if (!hasPermission) {
       setState(() {
         _errorMessage = '권한이 없어 사진을 불러올 수 없어요.';
@@ -238,6 +269,8 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
       imageQuality: 85,
       maxWidth: 1024,
     );
+    if (!mounted) return;
+
     if (xFile == null) {
       setState(() {
         _errorMessage = '사진 선택이 취소되었어요.';
@@ -250,49 +283,47 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
       _imageFile = File(xFile.path);
     });
 
-    final inputImage = InputImage.fromFilePath(xFile.path);
-
-    // OCR + 이미지 라벨링 병렬 실행
-    final labeler = ImageLabeler(
-      options: ImageLabelerOptions(confidenceThreshold: 0.55),
-    );
-    final textRecognizer = TextRecognizer(script: TextRecognitionScript.korean);
+    final selectedFile = File(xFile.path);
 
     try {
-      final results = await Future.wait([
-        labeler.processImage(inputImage),
-        textRecognizer.processImage(inputImage),
-      ]);
+      final apiResult = await _analyzeWithFlask(selectedFile);
 
-      final labels = results[0] as List<ImageLabel>;
-      final recognizedText = results[1] as RecognizedText;
+      if (!mounted) return;
 
-      // OCR 단어 추출: 2글자 이상, 중복 제거
-      final words = <String>{};
-      for (final block in recognizedText.blocks) {
-        for (final line in block.lines) {
-          for (final element in line.elements) {
-            final text = element.text.trim();
-            if (text.length >= 2) words.add(text);
-          }
-        }
-      }
+      final labelsJson = (apiResult['labels'] as List<dynamic>? ?? []);
+      final ocrJson = (apiResult['ocr_texts'] as List<dynamic>? ?? []);
+
+      final parsedLabels = labelsJson
+          .whereType<Map>()
+          .map(
+            (e) => PredictedLabel(
+              label: (e['label'] as String? ?? '').trim(),
+              score: (e['score'] as num? ?? 0).toDouble(),
+            ),
+          )
+          .where((e) => e.label.isNotEmpty)
+          .toList();
+
+      final parsedOcr = ocrJson
+          .whereType<String>()
+          .map((e) => e.trim())
+          .where((e) => e.length >= 2)
+          .toList();
 
       setState(() {
-        _labels = labels.take(5).toList();
-        _ocrTexts = words.take(8).toList();
+        _labels = parsedLabels.take(5).toList();
+        _ocrTexts = parsedOcr.take(8).toList();
         _isProcessing = false;
         if (_labels.isEmpty && _ocrTexts.isEmpty) {
           _errorMessage = '인식된 항목이 없어요. 다시 시도해보세요.';
         }
       });
-    } catch (e) {
+    } catch (_) {
+      if (!mounted) return;
       setState(() {
         _isProcessing = false;
-        _errorMessage = '인식 중 오류가 발생했어요.';
+        _errorMessage = '서버 인식 중 오류가 발생했어요. Flask 서버 실행 상태를 확인해주세요.';
       });
-    } finally {
-      await Future.wait([labeler.close(), textRecognizer.close()]);
     }
   }
 
@@ -582,9 +613,8 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
             spacing: 6,
             runSpacing: 6,
             children: _labels.map((label) {
-              final confidence = (label.confidence * 100).toInt();
-              final displayText =
-                  isKorean ? _toKorean(label.label) : label.label;
+              final confidence = (label.score * 100).toInt();
+              final displayText = isKorean ? _toKorean(label.label) : label.label;
               return GestureDetector(
                 onTap: () => widget.onLabelSelected(displayText),
                 child: Container(
