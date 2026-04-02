@@ -19,10 +19,12 @@ label_image.py — BLIP 이미지 캡셔닝으로 정확한 물체 인식
 
 import sys
 import re
+from functools import lru_cache
 from pathlib import Path
 from PIL import Image
 from transformers import pipeline, BlipProcessor, BlipForConditionalGeneration
 import torch
+import nltk
 
 KOREAN_MAP = {
     "cotton swab": "면봉", "cotton ball": "솜뭉치", "bandage": "붕대",
@@ -33,7 +35,7 @@ KOREAN_MAP = {
     "apple": "사과", "banana": "바나나", "bread": "빵", "milk": "우유",
     "egg": "달걀", "rice": "쌀/밥", "noodle": "면", "coffee": "커피",
     "juice": "주스", "water bottle": "물병", "pizza": "피자",
-    "hamburger": "햄버거", "scissors": "가위", "pen": "펜",
+    "hamburger": "햄버거", "scissors": "가위",
     "notebook": "노트", "book": "책", "tape": "테이프",
     "envelope": "봉투", "key": "열쇠", "umbrella": "우산",
     "candle": "양초", "box": "상자", "phone": "휴대폰",
@@ -42,6 +44,23 @@ KOREAN_MAP = {
     "watch": "시계", "glasses": "안경", "hat": "모자",
     "sponge": "스펀지", "detergent": "세제", "pot": "냄비",
     "cup": "컵", "plate": "접시", "knife": "칼/나이프",
+}
+
+TOKEN_KOREAN_MAP = {
+    "person": "사람", "man": "남성", "woman": "여성", "child": "아이",
+    "boy": "소년", "girl": "소녀", "face": "얼굴", "hand": "손",
+    "head": "머리", "hair": "머리카락", "shirt": "셔츠", "pants": "바지",
+    "table": "테이블", "desk": "책상", "chair": "의자", "room": "방",
+    "wall": "벽", "floor": "바닥", "window": "창문", "door": "문",
+    "bed": "침대", "pillow": "베개", "blanket": "담요", "shelf": "선반",
+    "bottle": "병", "glass": "유리컵", "can": "캔", "food": "음식",
+    "fruit": "과일", "vegetable": "채소", "meat": "고기", "fish": "생선",
+    "car": "자동차", "bus": "버스", "bike": "자전거", "train": "기차",
+    "road": "도로", "street": "거리", "tree": "나무", "flower": "꽃",
+    "sky": "하늘", "cloud": "구름", "sun": "태양", "dog": "강아지",
+    "cat": "고양이", "bird": "새", "mouse": "마우스", "keyboard": "키보드",
+    "monitor": "모니터", "screen": "화면", "remote": "리모컨", "tv": "TV",
+    "swab": "면봉", "qtip": "면봉", "stick": "막대",
 }
 
 BLIP_MODEL = "Salesforce/blip-image-captioning-base"  # 이미지를 자세히 설명하는 모델
@@ -65,21 +84,105 @@ COTTON_SWAB_NEGATIVE = [
 IS_COTTON_SWAB_THRESHOLD = 0.60  # 60% 이상이면 면봉으로 판단
 
 
+def _singularize(token: str) -> str:
+    """간단한 복수형을 단수형으로 정규화합니다."""
+    if len(token) > 4 and token.endswith("ies"):
+        return token[:-3] + "y"
+    if len(token) > 3 and token.endswith("es"):
+        return token[:-2]
+    if len(token) > 3 and token.endswith("s"):
+        return token[:-1]
+    return token
+
+
+@lru_cache(maxsize=1)
+def _get_en_ko_translator():
+    """사전에 없는 라벨 번역용 모델을 지연 로드합니다."""
+    device = 0 if torch.cuda.is_available() else -1
+    return pipeline(
+        "translation_en_to_ko",
+        model="Helsinki-NLP/opus-mt-en-ko",
+        device=device,
+    )
+
+
+def _fallback_translate_to_korean(text: str) -> str | None:
+    """영문 텍스트를 한국어로 번역합니다. 실패 시 None을 반환합니다."""
+    clean = text.strip()
+    if not clean:
+        return None
+    try:
+        translator = _get_en_ko_translator()
+        result = translator(clean, max_length=64)
+        if result and isinstance(result, list):
+            translated = result[0].get("translation_text", "").strip()
+            return translated or None
+    except Exception:
+        return None
+    return None
+
+
 def _translate_label(label: str) -> str:
     """영문 라벨을 한국어로 바꾸고, 없으면 원문을 반환합니다."""
     key = label.strip().lower()
-    for en, ko in KOREAN_MAP.items():
-        if en.lower() == key:
-            return ko
-    return label
+    if key in KOREAN_MAP:
+        return KOREAN_MAP[key]
+
+    singular = _singularize(key)
+    if singular in KOREAN_MAP:
+        return KOREAN_MAP[singular]
+
+    if key in TOKEN_KOREAN_MAP:
+        return TOKEN_KOREAN_MAP[key]
+    if singular in TOKEN_KOREAN_MAP:
+        return TOKEN_KOREAN_MAP[singular]
+
+    # 복합어는 단어 단위로 번역 가능할 때만 결합해 반환
+    parts = [p for p in key.replace("-", " ").split() if p]
+    if parts:
+        translated_parts: list[str] = []
+        for p in parts:
+            base = _singularize(p)
+            ko = TOKEN_KOREAN_MAP.get(p) or TOKEN_KOREAN_MAP.get(base)
+            if not ko:
+                translated_parts = []
+                break
+            translated_parts.append(ko)
+        if translated_parts:
+            return " ".join(translated_parts)
+
+    translated = _fallback_translate_to_korean(label)
+    if translated:
+        return translated
+
+    return f"미번역:{label}"
+
+
+def _ensure_nltk_resources() -> None:
+    """품사 태깅에 필요한 NLTK 리소스를 준비합니다."""
+    resources = [
+        ("tokenizers/punkt", "punkt"),
+        ("taggers/averaged_perceptron_tagger", "averaged_perceptron_tagger"),
+    ]
+    for path, name in resources:
+        try:
+            nltk.data.find(path)
+        except LookupError:
+            nltk.download(name, quiet=True)
 
 
 def _extract_keywords(caption: str, limit: int = 3) -> list[str]:
-    """BLIP 설명문에서 핵심 단어만 추출합니다."""
+    """BLIP 설명문에서 명사만 추출합니다."""
+    _ensure_nltk_resources()
     tokens = re.sub(r"[^a-zA-Z0-9 ]+", " ", caption.lower()).split()
+    tagged = nltk.pos_tag(tokens)
+
+    noun_tags = {"NN", "NNS", "NNP", "NNPS"}
     keywords: list[str] = []
-    for token in tokens:
+    for token, tag in tagged:
         if token in KEYWORD_STOPWORDS or len(token) < 3:
+            continue
+        if tag not in noun_tags:
             continue
         if token not in keywords:
             keywords.append(token)
