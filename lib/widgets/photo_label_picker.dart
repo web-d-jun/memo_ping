@@ -266,12 +266,28 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
       _errorMessage = null;
     });
 
+    // macOS는 카메라 미지원 → gallery로 대체
+    final effectiveSource =
+        (defaultTargetPlatform == TargetPlatform.macOS &&
+                source == ImageSource.camera)
+            ? ImageSource.gallery
+            : source;
+
     final picker = ImagePicker();
-    final xFile = await picker.pickImage(
-      source: source,
-      imageQuality: 85,
-      maxWidth: 1024,
-    );
+    XFile? xFile;
+    try {
+      xFile = await picker.pickImage(
+        source: effectiveSource,
+        imageQuality: 85,
+        maxWidth: 1024,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = '사진을 불러오는 중 오류가 발생했어요: $e';
+      });
+      return;
+    }
     if (!mounted) return;
 
     if (xFile == null) {
@@ -283,7 +299,7 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
 
     setState(() {
       _isProcessing = true;
-      _imageFile = File(xFile.path);
+      _imageFile = File(xFile!.path);
     });
 
     final selectedFile = File(xFile.path);
@@ -358,6 +374,14 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
                 style:
                     TextStyle(fontSize: 13, color: Colors.grey.shade500),
               ),
+              if (defaultTargetPlatform == TargetPlatform.macOS)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    '※ macOS에서는 카메라 대신 파일 선택창이 열립니다',
+                    style: TextStyle(fontSize: 11, color: Colors.orange.shade400),
+                  ),
+                ),
               const SizedBox(height: 20),
               Row(
                 children: [
