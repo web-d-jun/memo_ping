@@ -98,6 +98,19 @@ class _HomeScreenState extends State<HomeScreen> {
     await Permission.camera.request();
   }
 
+  Future<void> _openEditMemo(MemoItem memo) async {
+    final result = await Navigator.push<MemoItem>(
+      context,
+      MaterialPageRoute(builder: (_) => AddMemoScreen(initialMemo: memo)),
+    );
+    if (result != null) {
+      setState(() {
+        final idx = _memos.indexWhere((m) => m.id == result.id);
+        if (idx != -1) _memos[idx] = result;
+      });
+    }
+  }
+
   Future<void> _openAddMemo() async {
     await _preRequestCameraPermission();
     final result = await Navigator.push<MemoItem>(
@@ -131,7 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       itemBuilder: (_, i) => MemoCard(
                         item: filtered[i],
                         onToggle: () => _toggleMemo(filtered[i].id),
-                        onTap: () {},
+                        onTap: () => _openEditMemo(filtered[i]),
                         onDelete: () => _deleteMemo(filtered[i].id),
                       ),
                     ),

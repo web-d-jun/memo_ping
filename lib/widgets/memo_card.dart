@@ -40,101 +40,109 @@ class MemoCard extends StatelessWidget {
         child: const Icon(Icons.delete_rounded, color: Colors.white, size: 28),
       ),
       onDismissed: (_) => onDelete(),
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedOpacity(
-          opacity: item.isActive ? 1.0 : 0.5,
-          duration: const Duration(milliseconds: 250),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  // 아이콘
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: triggerBg,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(triggerIcon, color: triggerColor, size: 26),
-                  ),
-                  const SizedBox(width: 14),
-                  // 내용
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+      child: AnimatedOpacity(
+        opacity: item.isActive ? 1.0 : 0.5,
+        duration: const Duration(milliseconds: 250),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // 탭 가능한 영역 (아이콘 + 텍스트)
+                Expanded(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: onTap,
+                    child: Row(
                       children: [
-                        Text(
-                          item.title,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: item.isActive
-                                ? const Color(0xFF1A1A2E)
-                                : Colors.grey,
-                            decoration: item.isActive
-                                ? TextDecoration.none
-                                : TextDecoration.lineThrough,
+                        // 아이콘
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: triggerBg,
+                            borderRadius: BorderRadius.circular(14),
                           ),
+                          child: Icon(triggerIcon, color: triggerColor, size: 26),
                         ),
-                        if (item.description.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            item.description,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey.shade500,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Icon(triggerSubIcon,
-                                size: 13, color: triggerColor),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                item.triggerLabel,
+                        const SizedBox(width: 14),
+                        // 내용
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.title,
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  color: triggerColor,
-                                  fontWeight: FontWeight.w500,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: item.isActive
+                                      ? const Color(0xFF1A1A2E)
+                                      : Colors.grey,
+                                  decoration: item.isActive
+                                      ? TextDecoration.none
+                                      : TextDecoration.lineThrough,
                                 ),
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                          ],
+                              if (item.description.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  item.description,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Icon(triggerSubIcon,
+                                      size: 13, color: triggerColor),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      item.triggerLabel,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: triggerColor,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  // 토글
-                  Switch.adaptive(
-                    value: item.isActive,
-                    onChanged: (_) => onToggle(),
-                    activeThumbColor: const Color(0xFF5C6BC0),
-                    activeTrackColor: Color(0xFF5C6BC0).withValues(alpha: 0.5),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 8),
+                // 토글 (탭 영역과 분리)
+                Switch.adaptive(
+                  value: item.isActive,
+                  onChanged: (_) => onToggle(),
+                  activeThumbColor: const Color(0xFF5C6BC0),
+                  activeTrackColor: Color(0xFF5C6BC0).withValues(alpha: 0.5),
+                ),
+              ],
             ),
           ),
         ),

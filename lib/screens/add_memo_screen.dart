@@ -1,23 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
 import '../models/memo_item.dart';
 import '../widgets/photo_label_picker.dart';
 
 class AddMemoScreen extends StatefulWidget {
-  const AddMemoScreen({super.key});
+  final MemoItem? initialMemo;
+
+  const AddMemoScreen({super.key, this.initialMemo});
 
   @override
   State<AddMemoScreen> createState() => _AddMemoScreenState();
 }
 
 class _AddMemoScreenState extends State<AddMemoScreen> {
-  final _titleController = TextEditingController();
-  final _descController = TextEditingController();
-  final _locationController = TextEditingController();
+  late final TextEditingController _titleController;
+  late final TextEditingController _descController;
+  late final TextEditingController _locationController;
 
-  TriggerType _triggerType = TriggerType.location;
-  double _radius = 200;
-  TimeOfDay _selectedTime = const TimeOfDay(hour: 9, minute: 0);
-  final List<bool> _repeatDays = List.filled(7, false);
+  late TriggerType _triggerType;
+  late double _radius;
+  late TimeOfDay _selectedTime;
+  late List<bool> _repeatDays;
+  bool _isSaving = false;
+
+  bool get _isEditing => widget.initialMemo != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final m = widget.initialMemo;
+    _titleController = TextEditingController(text: m?.title ?? '');
+    _descController = TextEditingController(text: m?.description ?? '');
+    _locationController = TextEditingController(text: m?.locationName ?? '');
+    _triggerType = m?.triggerType ?? TriggerType.location;
+    _radius = m?.radius ?? 200;
+    _selectedTime = m?.triggerTime ?? const TimeOfDay(hour: 9, minute: 0);
+    _repeatDays = m != null ? List.from(m.repeatDays) : List.filled(7, false);
+  }
 
   bool get _canSave =>
       _titleController.text.trim().isNotEmpty &&
@@ -28,7 +47,7 @@ class _AddMemoScreenState extends State<AddMemoScreen> {
   void _save() {
     if (!_canSave) return;
     final memo = MemoItem(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: widget.initialMemo?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
       title: _titleController.text.trim(),
       description: _descController.text.trim(),
       triggerType: _triggerType,
@@ -37,6 +56,7 @@ class _AddMemoScreenState extends State<AddMemoScreen> {
       triggerTime:
           _triggerType == TriggerType.time ? _selectedTime : null,
       repeatDays: List.from(_repeatDays),
+      isActive: widget.initialMemo?.isActive ?? true,
     );
     Navigator.pop(context, memo);
   }
@@ -70,9 +90,9 @@ class _AddMemoScreenState extends State<AddMemoScreen> {
           color: const Color(0xFF1A1A2E),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          '새 메모 추가',
-          style: TextStyle(
+        title: Text(
+          _isEditing ? '메모 수정' : '새 메모 추가',
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
             color: Color(0xFF1A1A2E),
@@ -186,7 +206,7 @@ class _AddMemoScreenState extends State<AddMemoScreen> {
                   elevation: 0,
                 ),
                 child: Text(
-                  '저장하기',
+                  _isEditing ? '수정 완료' : '저장하기',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,

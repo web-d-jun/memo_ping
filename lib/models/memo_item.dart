@@ -10,6 +10,8 @@ class MemoItem {
   // Location fields
   final String locationName;
   final double radius; // meters
+  final double? latitude;
+  final double? longitude;
   // Time fields
   final TimeOfDay? triggerTime;
   final List<bool> repeatDays; // 0=월 ~ 6=일
@@ -22,6 +24,8 @@ class MemoItem {
     required this.triggerType,
     this.locationName = '',
     this.radius = 200,
+    this.latitude,
+    this.longitude,
     this.triggerTime,
     List<bool>? repeatDays,
     this.isActive = true,
@@ -58,6 +62,8 @@ class MemoItem {
     TriggerType? triggerType,
     String? locationName,
     double? radius,
+    double? latitude,
+    double? longitude,
     TimeOfDay? triggerTime,
     List<bool>? repeatDays,
     bool? isActive,
@@ -69,6 +75,8 @@ class MemoItem {
       triggerType: triggerType ?? this.triggerType,
       locationName: locationName ?? this.locationName,
       radius: radius ?? this.radius,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
       triggerTime: triggerTime ?? this.triggerTime,
       repeatDays: repeatDays ?? List.from(this.repeatDays),
       isActive: isActive ?? this.isActive,
