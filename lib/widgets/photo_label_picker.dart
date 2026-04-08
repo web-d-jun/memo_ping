@@ -320,7 +320,7 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
               score: (e['score'] as num? ?? 0).toDouble(),
             ),
           )
-          .where((e) => e.label.isNotEmpty)
+          .where((e) => e.label.isNotEmpty && e.score >= 0.5)
           .toList();
 
       final parsedOcr = ocrJson
@@ -330,7 +330,7 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
           .toList();
 
       setState(() {
-        _labels = parsedLabels.take(5).toList();
+        _labels = parsedLabels.take(3).toList();
         _ocrTexts = parsedOcr.take(8).toList();
         _isProcessing = false;
         if (_labels.isEmpty && _ocrTexts.isEmpty) {
@@ -628,7 +628,7 @@ class _PhotoLabelPickerState extends State<PhotoLabelPicker> {
         if (_labels.isNotEmpty) ...[
           if (_ocrTexts.isNotEmpty) const SizedBox(height: 10),
           Text(
-            '🏷️ 인식된 항목',
+            '💡 혹시 이건가요?',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,

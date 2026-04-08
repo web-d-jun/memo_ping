@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import '../models/memo_item.dart';
 import '../widgets/photo_label_picker.dart';
 
@@ -21,8 +21,9 @@ class _AddMemoScreenState extends State<AddMemoScreen> {
   late double _radius;
   late TimeOfDay _selectedTime;
   late List<bool> _repeatDays;
-  bool _isSaving = false;
-
+  bool _isFetchingLocation = false;
+  double? _currentLatitude;
+  double? _currentLongitude;
   bool get _isEditing => widget.initialMemo != null;
 
   @override
@@ -53,12 +54,58 @@ class _AddMemoScreenState extends State<AddMemoScreen> {
       triggerType: _triggerType,
       locationName: _locationController.text.trim(),
       radius: _radius,
+      latitude: _currentLatitude ?? widget.initialMemo?.latitude,
+      longitude: _currentLongitude ?? widget.initialMemo?.longitude,
       triggerTime:
           _triggerType == TriggerType.time ? _selectedTime : null,
       repeatDays: List.from(_repeatDays),
       isActive: widget.initialMemo?.isActive ?? true,
     );
     Navigator.pop(context, memo);
+  }
+
+  Future<void> _fetchCurrentLocation() async {
+    setState(() => _isFetchingLocation = true);
+
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('위치 권한이 필요합니다.')),
+          );
+        }
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _currentLatitude = position.latitude;
+        _currentLongitude = position.longitude;
+        // 좌표를 장소 이름 필드에 임시 표시
+        _locationController.text =
+            '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('위치를 가져오지 못했어요: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isFetchingLocation = false);
+    }
   }
 
   Future<void> _pickTime() async {
@@ -342,6 +389,60 @@ class _AddMemoScreenState extends State<AddMemoScreen> {
           hint: '장소 이름 (예: 김밥천국, 다이소, GS25)',
           icon: Icons.store_rounded,
           onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 10),
+        // 현재 위치 버튼
+        GestureDetector(
+          onTap: _isFetchingLocation ? null : _fetchCurrentLocation,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F5E9),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFF66BB6A).withValues(alpha: 0.4),
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_isFetchingLocation)
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFF66BB6A),
+                    ),
+                  )
+                else
+                  const Icon(
+                    Icons.my_location_rounded,
+                    color: Color(0xFF66BB6A),
+                    size: 18,
+                  ),
+                const SizedBox(width: 8),
+                Text(
+                  _isFetchingLocation ? '위치 가져오는 중...' : '현재 위치 사용',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF66BB6A),
+                  ),
+                ),
+                if (_currentLatitude != null) ...[
+                  const SizedBox(width: 6),
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: Color(0xFF66BB6A),
+                    size: 15,
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
         const SizedBox(height: 18),
         Row(
