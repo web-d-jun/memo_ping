@@ -82,4 +82,38 @@ class MemoItem {
       isActive: isActive ?? this.isActive,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'description': description,
+        'triggerType': triggerType.name,
+        'locationName': locationName,
+        'radius': radius,
+        'latitude': latitude,
+        'longitude': longitude,
+        'triggerTimeHour': triggerTime?.hour,
+        'triggerTimeMinute': triggerTime?.minute,
+        'repeatDays': repeatDays,
+        'isActive': isActive,
+      };
+
+  factory MemoItem.fromJson(Map<String, dynamic> json) => MemoItem(
+        id: json['id'] as String,
+        title: json['title'] as String,
+        description: json['description'] as String? ?? '',
+        triggerType: TriggerType.values.byName(json['triggerType'] as String),
+        locationName: json['locationName'] as String? ?? '',
+        radius: (json['radius'] as num).toDouble(),
+        latitude: (json['latitude'] as num?)?.toDouble(),
+        longitude: (json['longitude'] as num?)?.toDouble(),
+        triggerTime: json['triggerTimeHour'] != null
+            ? TimeOfDay(
+                hour: json['triggerTimeHour'] as int,
+                minute: json['triggerTimeMinute'] as int,
+              )
+            : null,
+        repeatDays: (json['repeatDays'] as List).cast<bool>(),
+        isActive: json['isActive'] as bool,
+      );
 }

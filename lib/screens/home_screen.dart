@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../models/memo_item.dart';
+import '../services/location_monitor_service.dart';
+import '../services/background_location_service.dart';
 import '../widgets/memo_card.dart';
 import 'add_memo_screen.dart';
+import 'package:memo_ping/main.dart' show notificationsPlugin;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,6 +17,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedFilter = 0; // 0: 전체, 1: 위치, 2: 시간
+
+  late final LocationMonitorService _locationMonitor;
 
   final List<MemoItem> _memos = [
     MemoItem(
@@ -71,15 +76,86 @@ class _HomeScreenState extends State<HomeScreen> {
   int get _timeCount =>
       _memos.where((m) => m.triggerType == TriggerType.time).length;
 
+  @override
+  void initState() {
+    super.initState();
+    _locationMonitor = LocationMonitorService(notificationsPlugin);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _requestLocationPermission();
+      final status = await Permission.locationWhenInUse.status;
+      if (status.isGranted || status.isLimited) {
+        // 방식 1: 포그라운드 모니터링
+        _locationMonitor.start(_memos);
+        // 방식 2: 백그라운드 서비스 시작
+        await BackgroundLocationService.start(_memos);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _locationMonitor.stop();
+    // 백그라운드 서비스는 앱 종료 후에도 유지 (stop 하지 않음)
+    super.dispose();
+  }
+
+  Future<void> _requestLocationPermission() async {
+    if (kIsWeb) return;
+    final platform = defaultTargetPlatform;
+    if (platform != TargetPlatform.android && platform != TargetPlatform.iOS) {
+      return;
+    }
+
+    var status = await Permission.locationWhenInUse.status;
+    if (status.isGranted || status.isLimited) return;
+
+    status = await Permission.locationWhenInUse.request();
+    if (!mounted) return;
+
+    if (!status.isGranted && !status.isLimited) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: const [
+              Icon(Icons.location_off_rounded, color: Colors.white, size: 18),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '위치 권한이 없으면 위치 기반 메모 알림 등 일부 서비스 이용이 원활하지 않을 수 있어요.',
+                  style: TextStyle(fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF5C6BC0),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          duration: const Duration(seconds: 6),
+          action: SnackBarAction(
+            label: '설정 열기',
+            textColor: Colors.white,
+            onPressed: openAppSettings,
+          ),
+        ),
+      );
+    }
+  }
+
   void _toggleMemo(String id) {
     setState(() {
       final idx = _memos.indexWhere((m) => m.id == id);
       if (idx != -1) _memos[idx].isActive = !_memos[idx].isActive;
     });
+    _locationMonitor.updateMemos(_memos);
+    BackgroundLocationService.saveMemos(_memos);
   }
 
   void _deleteMemo(String id) {
     setState(() => _memos.removeWhere((m) => m.id == id));
+    _locationMonitor.updateMemos(_memos);
+    BackgroundLocationService.saveMemos(_memos);
   }
 
   Future<void> _preRequestCameraPermission() async {
@@ -108,6 +184,8 @@ class _HomeScreenState extends State<HomeScreen> {
         final idx = _memos.indexWhere((m) => m.id == result.id);
         if (idx != -1) _memos[idx] = result;
       });
+      _locationMonitor.updateMemos(_memos);
+      BackgroundLocationService.saveMemos(_memos);
     }
   }
 
@@ -119,6 +197,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (result != null) {
       setState(() => _memos.insert(0, result));
+      _locationMonitor.updateMemos(_memos);
+      BackgroundLocationService.saveMemos(_memos);
     }
   }
 

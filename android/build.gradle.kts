@@ -1,6 +1,5 @@
-import com.android.build.api.dsl.LibraryExtension
+import com.android.build.gradle.LibraryExtension
 import org.gradle.api.JavaVersion
-import org.gradle.api.tasks.compile.JavaCompile
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
@@ -26,23 +25,18 @@ subprojects {
 }
 
 subprojects {
-    tasks.withType<JavaCompile>().configureEach {
-        sourceCompatibility = JavaVersion.VERSION_17.toString()
-        targetCompatibility = JavaVersion.VERSION_17.toString()
-        options.compilerArgs.add("-Xlint:-options")
-    }
-
-    plugins.withId("com.android.library") {
-        extensions.configure<LibraryExtension> {
-            compileOptions {
+    if (project.name != "app") {
+        afterEvaluate {
+            // tasks.withType<JavaCompile> 대신 AGP compileOptions DSL로 직접 설정
+            // → AGP가 내부적으로 JavaCompile 태스크를 구성할 때 이 값이 최종값으로 사용됨
+            extensions.findByType<LibraryExtension>()?.compileOptions {
                 sourceCompatibility = JavaVersion.VERSION_17
                 targetCompatibility = JavaVersion.VERSION_17
             }
+            tasks.withType<KotlinJvmCompile>().configureEach {
+                compilerOptions.jvmTarget.set(JvmTarget.JVM_17)
+            }
         }
-    }
-
-    tasks.withType<KotlinJvmCompile>().configureEach {
-        compilerOptions.jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
