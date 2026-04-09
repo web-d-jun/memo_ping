@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import '../models/memo_item.dart';
 import '../widgets/photo_label_picker.dart';
+import 'location_picker_screen.dart';
 
 class AddMemoScreen extends StatefulWidget {
   final MemoItem? initialMemo;
@@ -20,6 +22,7 @@ class _AddMemoScreenState extends State<AddMemoScreen> {
   late double _radius;
   late TimeOfDay _selectedTime;
   late List<bool> _repeatDays;
+  LatLng? _pickedLatLng; // 지도에서 선택한 좌표
   bool get _isEditing => widget.initialMemo != null;
 
   @override
@@ -33,12 +36,16 @@ class _AddMemoScreenState extends State<AddMemoScreen> {
     _radius = m?.radius ?? 200;
     _selectedTime = m?.triggerTime ?? const TimeOfDay(hour: 9, minute: 0);
     _repeatDays = m != null ? List.from(m.repeatDays) : List.filled(7, false);
+    // 수정 모드: 기존 좌표 복원
+    if (m?.latitude != null && m?.longitude != null) {
+      _pickedLatLng = LatLng(m!.latitude!, m.longitude!);
+    }
   }
 
   bool get _canSave =>
       _titleController.text.trim().isNotEmpty &&
       (_triggerType == TriggerType.location
-          ? _locationController.text.trim().isNotEmpty
+          ? _locationController.text.trim().isNotEmpty && _pickedLatLng != null
           : true);
 
   void _save() {
@@ -50,14 +57,29 @@ class _AddMemoScreenState extends State<AddMemoScreen> {
       triggerType: _triggerType,
       locationName: _locationController.text.trim(),
       radius: _radius,
-      latitude: widget.initialMemo?.latitude,
-      longitude: widget.initialMemo?.longitude,
+      latitude: _pickedLatLng?.latitude,
+      longitude: _pickedLatLng?.longitude,
       triggerTime:
           _triggerType == TriggerType.time ? _selectedTime : null,
       repeatDays: List.from(_repeatDays),
       isActive: widget.initialMemo?.isActive ?? true,
     );
     Navigator.pop(context, memo);
+  }
+
+  Future<void> _openLocationPicker() async {
+    final result = await Navigator.push<LatLng>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(
+          initialPosition: _pickedLatLng,
+          initialRadius: _radius,
+        ),
+      ),
+    );
+    if (result != null) {
+      setState(() => _pickedLatLng = result);
+    }
   }
 
   Future<void> _pickTime() async {
@@ -341,6 +363,68 @@ class _AddMemoScreenState extends State<AddMemoScreen> {
           hint: '장소 이름 (예: 김밥천국, 다이소, GS25)',
           icon: Icons.store_rounded,
           onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 12),
+        // 지도에서 위치 선택 버튼
+        GestureDetector(
+          onTap: _openLocationPicker,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+            decoration: BoxDecoration(
+              color: _pickedLatLng != null
+                  ? const Color(0xFFE8F5E9)
+                  : const Color(0xFFF5F6FF),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _pickedLatLng != null
+                    ? const Color(0xFF66BB6A)
+                    : const Color(0xFF26C6DA),
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _pickedLatLng != null
+                      ? Icons.check_circle_rounded
+                      : Icons.map_rounded,
+                  color: _pickedLatLng != null
+                      ? const Color(0xFF66BB6A)
+                      : const Color(0xFF26C6DA),
+                  size: 18,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _pickedLatLng != null
+                      ? Text(
+                          '${_pickedLatLng!.latitude.toStringAsFixed(5)}, '
+                          '${_pickedLatLng!.longitude.toStringAsFixed(5)}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF66BB6A),
+                          ),
+                        )
+                      : const Text(
+                          '지도에서 위치 선택',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF26C6DA),
+                          ),
+                        ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: _pickedLatLng != null
+                      ? const Color(0xFF66BB6A)
+                      : const Color(0xFF26C6DA),
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
         ),
         const SizedBox(height: 18),
         Row(
